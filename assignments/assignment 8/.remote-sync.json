@@ -1,0 +1,18 @@
+{
+  "logger": {
+    "title": "Remote Sync"
+  },
+  "transport": "scp",
+  "uploadOnSave": true,
+  "useAtomicWrites": false,
+  "deleteLocal": false,
+  "hostname": "lnxsrv.seas.ucla.edu",
+  "target": "/u/eng/class/classkud/Desktop/assignment8",
+  "ignore": [
+    ".remote-sync.json",
+    ".git/**"
+  ],
+  "username": "classkud",
+  "password": "N14u07r1",
+  "watch": []
+}

@@ -1,0 +1,36 @@
+2) To checkout v3.0:
+$ git checkout v3.0 -b quote
+
+3) To patch:
+$ patch -p1 < ../quote-3.0-patch.txt
+
+4-5) To create a ChangeLog entry:
+$ emacs
+Press 'C-x 4 a' and add the following entry in the format of ChangeLog:
+* src/cmp.c: Change all printed backtick (`) characters to apostrophes (').
+* src/diff.c: Change all printed backtick (`) characters to apostrophes (').
+* src/diff3.c: Change all printed backtick (`) characters to apostrophes (').
+* src/dir.c: Change all printed backtick (`) characters to apostrophes (').
+* src/sdiff.c: Change all printed backtick (`) characters to apostrophes (').
+* src/util.c: Change all printed backtick (`) characters to apostrophes (').
+
+6) Add changes to commit & commit modifications:
+$ git add .
+$ git add -f ChangeLog
+$ git commit
+Add the message "Change all printed backtick (`) characters to apostrophes (')" as prompted.
+
+7) To create formatted patch:
+$ git format-patch v3.0 --stdout > ../formatted-patch.txt
+
+8) To checkout new partner branch:
+$ git checkout v3.0 -b partner
+To apply the patch:
+$ git am ../formatted-patch.txt
+Rebuild and test:
+$ ./bootstrap
+$ ./configure
+$ ./make check
+Also checked that the changes made actually worked with 'src/diff . -' which outputs an error without backticks (expected behavior).
+
+9) 

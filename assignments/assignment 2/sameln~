@@ -1,0 +1,67 @@
+#!/bin/bash
+# Two main assumptions: lexographical order means ASCII order, and that files starting with .
+# precede all the other ones.
+#
+# Implementation details:
+# First, we filter out the sorted regular files with hidden files taking precedence and put all
+# the filenames into REGFILES array. Next, we iterate through REGFILES from the end, and nest
+# another loop in which we iterate REGFILES from the start. In this manner, we know that the
+# first occurence of a duplicate will for sure be the file we need to make a hardlink to.
+
+dir=$1
+export LC_ALL='C' # assume lexographical order is just ASCII
+
+get_hidden_files() {
+    ls -a $dir | grep ^\\.
+}
+DIRHIDDENFILES=$(get_hidden_files) # files starting with .
+DIRFILES=`ls $dir`
+declare -a REGFILES # where all regular filenames are stored
+let count=0 # current size of REGFILES
+
+IFS=$'\t\n' # make sure spaces are not delimiters
+
+# add filenames or regular files to REGFILES
+check_and_add_file () {
+    if [ ! -r "$1" ]
+    then
+      echo "The file $1 needs read permission."
+      continue
+    fi
+ 
+    if [ -f "$1" ]
+    then
+      REGFILES[$count]="$1"
+      let count=count+1
+    fi
+}
+
+for HIDDENFILE in $DIRHIDDENFILES
+do
+    check_and_add_file "$dir/$HIDDENFILE"
+done
+
+for FILE in $DIRFILES
+do
+    check_and_add_file "$dir/$FILE"
+done
+
+# loop in reverse and look for duplicates
+for ((i=count-1; i >= 1; i--))
+do
+    CURFILE="${REGFILES[i]}"
+    for ((j=0; j < count; j++))
+    do
+	OTHERFILE="${REGFILES[j]}"
+	if [[ "$CURFILE" == "$OTHERFILE" ]]
+	then
+	  break # since REGFILES is sorted, CURFILE == OTHERFILE means
+	        # that there are no duplicates that are lexographically 'smaller'
+	elif cmp -s "$CURFILE" "$OTHERFILE"
+	then
+	  rm -f $CURFILE
+	  ln $OTHERFILE $CURFILE
+	  break
+	fi
+    done
+done

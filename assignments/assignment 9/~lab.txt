@@ -1,0 +1,82 @@
+1) To clone the diffutils repo:
+$ git clone git clone https://git.savannah.gnu.org/git/diffutils.git
+
+2) To get the log of changes and put them in a file (while in diffutils directory):
+$ git log > ../git-log.txt
+
+3) To get the list of tags and put them in a file (while in diffutils directory):
+$ git tag > ../git-tag.txt
+
+4) Open git-log.txt and search for the string of the commit:
+$ vim git-log.txt
+(while in vim): /maint: quote
+
+We get the following commit:
+commit 62ca21c8c1a5aa3488589dcb191a4ef04ae9ed4f
+Author: Paul Eggert <eggert@cs.ucla.edu>
+Date:   Wed Jan 25 23:46:16 2012 -0800
+
+    maint: quote 'like this' or "like this", not `like this'
+
+To generate a diff file, I found the hash of the previous commit and ran the following:
+$ git diff 70eafb8038cb866ca62ef96ff4dda217d408ce7e 62ca21c8c1a5aa3488589dcb191a4ef04ae9ed4f > ../quote-patch.txt
+
+5) To checkout the version v3.0 (creates a new local branch called v3.0):
+$ git checkout v3.0 -b v3.0
+
+6) To apply the patch:
+$ patch -p1 < ../quote-patch.txt
+The command would sometimes prompt which file to patch (as with HACKING, man/help2man, etc.) because the files don't exist. We skip past those by pressing "Enter". Also, some of the hunks failed to apply:
+
+patching file src/diff.c
+...
+Hunk #10 FAILED at 876.
+Hunk #11 FAILED at 906.
+Hunk #12 FAILED at 942.
+...
+3 out of 14 hunks FAILED -- saving rejects to file src/diff.c.rej
+patching file src/diff3.c
+...
+Hunk #6 FAILED at 433.
+...
+1 out of 9 hunks FAILED -- saving rejects to file src/diff3.c.rej
+
+7) Running git status shows which currently tracked files were modified. Among with modified files, we see bunch of untracked ones too. Those were created by the patch command, where *.orig files represent the original unpatched versions and *.rej files represent the hunks (chunks of data) that failed to apply.
+
+8-9) I opened every single modified file that wasn't *.c and ran vc-revert (C-x v u) which reverts all the changes made to that particular file. At the end, running git status yields only *.c files as modified ones. For each *.c file, I ran vc-diff (C-x v =) to check each hunk and reverted every changed that was related to documentation with diff-apply-hunk (C-c C-a) which undoes hunks in case they're already applied.
+
+10) Open all rejected .c files with:
+$ emacs *.c.rej
+For each rejected hunk, we can find its source with diff-goto-source (C-c C-c). I found the exact lines that were rejected in the source and manually changed the backtick character ` to an apostrophe '.
+
+11) Remove all untracked files with 'rm -rf' command.
+12) To create a patch from current changes:
+$ git diff > ../quote-3.0-patch.txt
+
+13) To build diffutils, run the following:
+$ export PATH=$PATH:/usr/local/cs/bin
+$ ./bootstrap
+Check the version of GNU C lib with ldd:
+$ ldd --version
+On lnxsrv03, the version is 2.12, so no need to apply the additional patch specified in the assignment page. We can proceed with:
+$ ./configure
+$ make
+
+The 'diff' binary is in the src directory, so to check whether backticks are replaced, we can run:
+$ cd src
+$ ./diff . -
+$ ./diff --help
+As expected, the output messages are all apostrophes.
+
+14) To make two separate directories with source codes, I renamed the modified diffutils directory:
+$ mv diffutils/ diffutils-3.0-patch/
+and then duplicated it:
+$ cp -R diffutils-3.0-patch/ diffutils-3.0/
+and in diffutils-3.0 discared all the changes:
+$ cd diffutils-3.0
+$ git checkout .
+and created the diff files with:
+$ cd ..
+$ diffutils-3.0-patch/src/diff -pru diffutils-3.0 diffutils-3.0-patch >quote-3.0-test.txt
+
+15) Running 'diff quote-3.0-test.txt quote-3.0-patch.txt' shows the differences between executing the modified diff and the system diff. All the differences are innocuous, and just includes extra timestamp information or inclusion of more characters in hunks. Other than that, the changes made are the same.

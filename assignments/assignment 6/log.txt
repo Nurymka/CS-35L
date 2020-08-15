@@ -1,0 +1,46 @@
+*** sort version check
+
+We make sure that our coreutils version is >8.6. The latest one installed is in /usr/local/cs/bin/sort, so run:
+$ export PATH=/usr/local/cs/bin:$PATH
+At the time of writing this log, 'sort --version' yields 8.24
+
+*** generating test data
+
+To generate 10,000,000 floating point numbers, we first read 40,000,000 (10,000,000 * sizeof(float)) bytes off of /dev/random:
+$ head --bytes=40000000 < /dev/urandom > floats.txt
+And then, we need to format those bytes as single-precision floating points:
+$ od -f < floats.txt > floats_temp.txt
+Formatting with od leaves the byte offsets and extra spaces that we don't want, so we run a combination of sed and tr:
+$ sed 's/^[0-9]\{7,\}[ \n]*//' floats_temp.txt | tr -s ' ' '\n' > floats.txt
+In this case, we used a regex that matches all byte offsets and the following whitespace characters:
+^ - starts at the beginning of the string
+[0-9]\{7,\} - seven or more consecutive digits (match the address itself)
+[ \n]* - zero or more spaces or tab characters (match the following whitespaces)
+Replacing the match with an empty string essentially deletes it. And then tr squeezes any repeating space characters
+and replaces them with newlines.
+
+*** timing sort
+
+Now, we time the sort function with a different number of threads:
+
+$ time -p sort -g --parallel=1 < floats.txt > /dev/null
+real 96.25
+user 96.09
+sys 0.16
+
+$ time -p sort -g --parallel=2 < floats.txt > /dev/null
+real 52.44
+user 99.48
+sys 0.19
+
+$ time -p sort -g --parallel=4 < floats.txt > /dev/null
+real 30.11
+user 101.01
+sys 0.25
+
+$ time -p sort -g --parallel=8 < floats.txt > /dev/null
+real 22.73
+user 111.46
+sys 4.99
+
+

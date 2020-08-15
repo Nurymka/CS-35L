@@ -1,0 +1,75 @@
+To test different versions of sfrob, I created multiple files:
+n15.txt - 786432 lines (24903680 bytes)
+n14.txt - 393216 lines (12451840 bytes)
+n13.txt - 196608 lines (6225920 bytes)
+n12.txt - 98304 lines (3112960 bytes)
+n11.txt - 49152 lines (1556480 bytes)
+n10.txt - 24576 lines (778240 bytes)
+
+*** Overall performance
+Generally, the differences in performance shine through at
+larger input sizes. In most cases, sfrobu and sfrobs outperform other
+versions by a sizeable amount. With sfrobu beating sfrob every time,
+we can see how sfrobu being able to read the whole file with one
+'read' system call can make a difference. Versions with -f options
+are usually slower than their originals, as ignoring the case
+and calling 'toupper' for every single character takes time.
+Taking the average of all sfrob versions and comparing
+them demonstrates that doubling the input size results in roughly
+double the time to execute.
+
+n15.txt
+-----     sfrob     sfrobu      sfrobu -f     sfrobs      sfrobs -f
+real      13.584s   12.946s     15.010s       13.831s     14.809s   -- sfrobu
+user      3.444s    3.453s      4.526s        3.459s      4.461s
+sys       1.138s    1.163s      1.089s        0.978s      0.976s
+
+n14.txt
+-----     sfrob     sfrobu      sfrobu -f     sfrobs      sfrobs -f
+real      8.016s    6.153s      6.680s        5.964s      7.086s    -- sfrobs
+user      1.629s    1.668s      2.164s        1.712s      2.235s
+sys       0.598s    0.597s      0.546s        0.457s      0.569s
+
+n13.txt
+-----     sfrob     sfrobu      sfrobu -f     sfrobs      sfrobs -f
+real      3.188s    2.969s      3.495s        2.863s      3.475s    -- sfrobs
+user      0.783s    0.802s      1.031s        0.836s      1.121s
+sys       0.295s    0.276s      0.301s        0.270s      0.252s
+
+n12.txt
+-----     sfrob     sfrobu      sfrobu -f     sfrobs      sfrobs -f
+real      1.202s    1.344s      1.398s        1.321s      1.464s    -- sfrob
+user      0.390s    0.388s      0.508s        0.373s      0.468s
+sys       0.129s    0.134s      0.145s        0.119s      0.145s
+
+n11.txt
+-----     sfrob     sfrobu      sfrobu -f     sfrobs      sfrobs -f
+real      0.358s    0.345s      0.362s        0.428s      0.446s    -- sfrobu
+user      0.177s    0.180s      0.237s        0.175s      0.223s
+sys       0.067s    0.070s      0.062s        0.076s      0.065s
+
+n10.txt
+-----     sfrob     sfrobu      sfrobu -f     sfrobs      sfrobs -f
+real      0.142s    0.146s      0.178s        0.174s      0.160s     -- sfrob
+user      0.087s    0.087s      0.116s        0.082s      0.105s
+sys       0.032s    0.035s      0.029s        0.035s      0.041s
+
+*** Number of comparsions vs. input lines
+
+To get the number of comparsions, I ran sfrobu through gdb and set a breakpoint
+at frobcmp, ignoring it by a huge number. Right before returning from main, I
+check the number of times the method was called.
+
+n15.txt - 96993303 comps (2.09x)
+n14.txt - 46202902 comps (2.10x)
+n13.txt - 21954581 comps (2.11x)
+n12.txt - 10403860 comps (2.17x)
+n11.txt - 4915219 comps (2.12x)
+n10.txt - 2314258 comps
+
+For double the input size we get around 2.118x growth in the number of comparisons.
+Using (number of lines, number of computations) as (x, y) points on our graph, we
+can calculate the line of best fit:
+f(x) = 124.54x + -1673227.57
+The function is an estimate that only works for large number of lines.
+Still, linear growth of number of comparsions vs. input lines gives us a O(n) complexity.

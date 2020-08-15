@@ -1,0 +1,114 @@
+* Installation
+
+Our first efforts include installing the buggy version of ls provided by
+Coreutils 7.6:
+
+$ mkdir ~/Desktop/assignment3
+$ cd ~/Desktop/assignment3
+-- create and change the current directory to assignment3
+where all assignment related files will be stored
+
+$ wget ftp://ftp.gnu.org/gnu/coreutils/coreutils-7.6.tar.gz
+-- download the coreutils tar file provided in the assignment page
+
+$ tar -xzvf coreutils-7.6.tar.gz
+-- unzip the tar file containing coreutils
+
+$ mkdir ~/coreutilsInstall
+-- create the directory where we'll be installing Coreutils 7.6
+
+$ cd ~/coreutilsInstall
+$ pwd
+/u/eng/class/classkud/coreutilsInstall
+-- because the configure script we'll be running next requires
+an absolute path to specify a custom installation path,
+we "pwd" in the directory we'll be installing Coreutils
+
+$ cd ~/Desktop/assignment3/coreutils-7.6
+$ ./configure --prefix="/u/eng/class/classkud/coreutilsInstall"
+-- based on system-dependent variables, configure script
+creates the Makefile and couple of other .h file as well
+as 'config.status' script to recreate the current config
+
+$ make; make install
+-- compiles and installs Coreutils at ~/coreutilsInstall. As a
+result, we'll see three new directories created. Those are
+"bin", "lib" and "share".
+
+* Reproducing the bug
+
+The buggy ls executable is contained in ~/coreutilsInstall/bin/ls.
+While in ~/coreutilsInstall/bin, we can run:
+
+$ ./ls -l /bin/bash
+-rwxr-xr-x 1 root root 942200 2017-02-15 04:37 /bin/bash
+
+$ ls -l /bin/bash
+-rwxr-xr-x 1 root root 942200 Feb 15  2017 /bin/bash
+
+As we expect, with the current locale set to 'en_US.UTF-8'
+for all settings, we get the buggy YYYY-MM-DD format instead
+of the Unix traditional format.
+
+* Patching the bug
+
+To patch the bug, we use Pádraig Brady's workaround. We copy
+the part of the email that starts from '--- a/NEWS' which
+is the the start of the diff file. Using vim, we clean up
+the unneeded bash input, specifically the lines:
+
+diff --git a/src/ls.c b/src/ls.c
+index 1bb6873..4531b94 100644
+
+We save this patch as "coreutils.patch". Next, we cd
+into the coreutils-7.6 directory and dry run to
+make sure that there are no problems with the patch:
+
+$ patch -p1 --dry-run < coreutils.patch
+
+Since the output shows a successful run, we can remove
+the --dry-run flag and apply the patch. Note that
+the -p1 flag is needed to omit a/, b/ from the
+diff file, so the patch command can successfully find
+the needed files.
+
+We can now recompile:
+$ make
+
+and check the fixed ls executable in ./coreutils-7.6/src:
+$ cd ./src
+$ ./ls -l /bin/bash
+-rwxr-xr-x 1 root root 942200 Feb 15  2017 /bin/bash
+
+and indeed, the output is now in the correct Unix format.
+
+* Testing
+
+Currently, we have two separate builds of ls.
+The patched one at ~/Desktop/assignment3/coreutils-7.6/src/ls,
+and the unpatched at in ~/coreutilsInstall/bin/ls.
+
+To test both, I created files 'newfile' and 'oldfile':
+
+$ touch newfile
+$ touch -t 201004100959.30 oldfile
+
+The newfile's modification timestamp will be the moment it was created,
+while oldfile's timestamp will be back from 2010.
+
+The patched ls gives out the following outputs
+(included extended paths to show that ls's are indeed in separate
+locations) with correct Unix format:
+
+$ ~/Desktop/assignment3/coreutils-7.6/src/ls -l newfile
+-rw-r--r-- 1 classkud class 0 Oct 23 16:25 newfile
+$ ~/Desktop/assignment3/coreutils-7.6/src/ls -l oldfile
+-rw-r--r-- 1 classkud class 0 Apr 10  2010 oldfile
+
+The unpatched ls gives out the following outputs with
+fallback iso dates:
+
+$ ~/coreutilsInstall/bin/ls -l newfile
+-rw-r--r-- 1 classkud class 0 2017-10-23 16:25 newfile
+$ ~/coreutilsInstall/bin/ls -l oldfile
+-rw-r--r-- 1 classkud class 0 2010-04-10 09:59 oldfile

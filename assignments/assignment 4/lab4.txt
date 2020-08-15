@@ -1,0 +1,186 @@
+* Installation & Renaming Patch
+
+We start off by downloading the buggy coreutils and unzipping it:
+
+$ wget http://web.cs.ucla.edu/classes/fall17/cs35L/assign/coreutils-with-bug.tar.gz
+$ tar -xzvf coreutils-with-bug.tar.gz
+
+If we try to build it as-is, we get the following output:
+
+$ ./configure && make
+[...]
+In file included from utimecmp.c:41:
+utimens.h:2: error: conflicting types for 'futimens'
+/usr/include/sys/stat.h:374: note: previous declaration of 'futimens' was here
+make[3]: *** [utimecmp.o] Error 1
+make[3]: Leaving directory `/w/home.06/class/classkud/Desktop/assignment4/coreutils-with-bug/lib'
+make[2]: *** [all] Error 2
+make[2]: Leaving directory `/w/home.06/class/classkud/Desktop/assignment4/coreutils-with-bug/lib'
+make[1]: *** [all-recursive] Error 1
+make[1]: Leaving directory `/w/home.06/class/classkud/Desktop/assignment4/coreutils-with-bug'
+make: *** [all] Error 2
+
+The output from the make script reveals the underlying reason. /usr/include
+directory contains header files for compiling C. /usr/include/sys/stat.h
+defines:
+
+extern int futimens (int __fd, __const struct timespec __times[2]) __THROW;
+
+and coreutils-with-bug/lib/utimens.h defines:
+
+int futimens (int fd ATTRIBUTE_UNUSED, char const *file, struct timespec const timespec[2])
+
+C doesn't support function overloading, so we can't define two methods with
+different signatures but with the same name. The renaming patch solves this
+by changing all occurences of 'futimens' function to 'coreutils_futimens'
+(even though we didn't stumble upon the error in the output, the same holds
+true for function 'tee' which is renamed to coreutils_tee):
+
+$ cd ~/Desktop/assignment4/coreutils-with-bug
+enters the coreutils directory
+
+$ vim renaming.patch
+we create the patch file and paste the contents provided in the assignment
+page
+
+$ patch < renaming.patch
+the diff file specifies the names with tilde (~) characters, so the patch
+program can't find it. So for every file, I typed the relative path for the
+patch program.
+
+$ make
+after the rename patch, we can actually compile coreutils and produce the
+executables at src/.
+
+* Bug with files from the distant past
+
+As told in the assignment, we create a temporary directory and three different
+files:
+$ tmp=$(mktemp -d)
+$ cd $tmp
+$ touch -d '1918-11-11 11:00 GMT' wwi-armistice
+$ touch now
+$ touch now1
+
+Between 'touch now' and 'touch now1' I waited a bit, so the output from
+$ TZ=UTC0 ls -lt --full-time wwi-armistice now now1
+results in a minute difference between now1 and now:
+-rw-r--r-- 1 classkud class 0 1918-11-11 11:00:00.000000000 +0000 wwi-armistice
+-rw-r--r-- 1 classkud class 0 2017-10-29 04:42:31.527911264 +0000 now1
+-rw-r--r-- 1 classkud class 0 2017-10-29 04:41:46.639855322 +0000 now
+
+To investigate the problem, we first run the configure script in
+coreutils-withbug/ again
+but with CFLAGS="-g -O0" (-g is the debugging flag, -O0 removes any
+compiler optimizations):
+
+$ ./configure CFLAGS="-g -O0"
+$ make
+
+As the option -t that sorts by modification time produces the wrong output,
+it makes sense to search for that string '-t' in ls.c. This leads us sort_type
+enum with value sort_time, which is used in case the input contained the option
+'-t'. Search for 'sort_time' leads us to the function sort_files containing a
+switch statement with "case time_mtime:". If the code is working correctly, we
+must end up at case time_mtime, where the comparator function is set to
+compare_mtime. The function compare_mtime, on the other hand, calls cmp_time
+which calls timespec_cmp to compare two different timestamp values. Using gdb,
+we find timespec_cmp's definition (from the temp directory):
+
+$ gdb ~/Desktop/assignment4/coreutils-with-bug/src/ls
+(gdb) r -lt --full-time wwi-armistice now1 now
+(gdb) break cmp_time
+(gdb) break timespec_cmp
+-- when we're on second breakpoint
+(gdb) list
+
+43	/* Return negative, zero, positive if A < B, A == B, A > B, respectively.
+44	   Assume the nanosecond components are in range, or close to it.  */
+45	static inline int
+46	timespec_cmp (struct timespec a, struct timespec b)
+47	{
+48	  int diff = a.tv_sec - b.tv_sec;
+49	  return diff ? diff : a.tv_nsec - b.tv_nsec;
+50	}
+
+After doing some investigation into the timespec struct and its value types:
+(gdb) ptype a
+type = struct timespec {
+    __time_t tv_sec;
+    long int tv_nsec;
+}
+(gdb) ptype a->tv_sec
+type = long int
+
+We can see that to compare two different timestamp values, we subtract a.tv_sec
+- b.tv_sec, which are both long ints which are later truncated to an int type,
+leaving the function vulnerable to underflows/overflows. That is exactly the
+case with the file wwi-armistice:
+-- we break at timespec_cmp when one of the files compared is wwi-armistice
+(gdb) info args
+a = {tv_sec = 1509304820, tv_nsec = 706038571}
+b = {tv_sec = -1613826000, tv_nsec = 0}
+
+The file b has a negative Unix timestamp in b->tv_sec, which is the file
+wwi-armistice. Note that the temporary file we created is in the local
+file system ext4 (can know by running 'df -T ./' in the tmp directory),
+which uses a signed 32-bit integer to represent timestamps. Therefore, any
+date before Jan 1, 1970 can be represented with a negative value. The problem
+here is that line "int diff = a.tv_sec - b.tv_sec;" with values
+a->tv_sec=1509304820 and b->tv_sec=-1613826000 produces a negative value
+when truncated to int:
+
+(gdb) n
+49	  return diff ? diff : a.tv_nsec - b.tv_nsec;
+(gdb) print diff
+$18 = -1171836476
+
+To resolve this bug, we substitute the subtraction with direct comparisons,
+which might take more asm instructions, but produce the correct results:
+
+int diff = (a.tv_sec < b.tv_sec) ? -1 : (a.tv_sec > b.tv_sec);
+
+After replacing the line and rebuilding coreutils, we can test ls -lt again:
+
+$ ~/Desktop/assignment4/coreutils-with-bug/src/ls -lt --full-time wwi-armistice now1 now
+-rw-r--r-- 1 classkud class 0 2017-10-29 12:20:20.706038571 -0700 now1
+-rw-r--r-- 1 classkud class 0 2017-10-29 12:20:16.539890764 -0700 now
+-rw-r--r-- 1 classkud class 0 1918-11-11 03:00:00.000000000 -0800 wwi-armistice
+
+Now ls produces the correct results.
+Note: when we test ls -lt in the home directory instead, we can see that
+wwi-armistice seems to have been modified in the year 2054. The reason for that
+is that the filesystem in home directory is NFS (from 'df -T ~/'), which uses
+unsigned 32-bit integers for timestamps, leading to underflow for file
+wwi-armistice and producing correct results for the year 2054. The system
+installed ls outputs:
+-rw-r--r-- 1 classkud class 0 2054-12-17 09:28:16.000000000 -0800 wwi-armistice
+-rw-r--r-- 1 classkud class 0 2017-10-29 00:50:52.678065000 -0700 now1
+-rw-r--r-- 1 classkud class 0 2017-10-29 00:50:49.429129000 -0700 now
+
+* Make a ChangeLog entry
+
+Since we've made a change to one of the files in coreutils, we can log that in
+emacs with "C-x 4 a", which creates a new buffer ChangeLog in the standard
+format. We type in what've changed in lib/timespec.h and save the file.
+
+* Creating a patch file
+
+We mainly use the 'diff -u' command to generate patch files. For lib/timespec.h,
+we create a new copy of it with needed changes:
+-- in coreutils-with-bug directory
+$ cp lib/timespec.h lib/timespec.h~
+$ vim lib/timespec.h
+-- replace the diff line in the timespec_cmp function
+$ diff -u lib/timespec.h lib/timespec.h~ > timespec.patch
+
+To make a diff for newly created ChangeLog, we can diff it with /dev/null:
+$ diff -u /dev/null ChangeLog > changelog.patch
+
+It's important that in lab4.diff, the newly created changelog comes at the top
+of the file:
+$ cat changelog.patch > lab4.diff
+$ cat timespec.patch >> lab4.diff
+
+Now, unpatched builds of coreutils-with-bug can be patched with:
+$ patch -p0 < lab4.diff

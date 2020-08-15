@@ -1,0 +1,37 @@
+*** Laboratory
+
+Our first efforts include installing the buggy version of ls provided by
+Coreutils 7.6:
+
+$ mkdir ~/Desktop/assignment3
+$ cd ~/Desktop/assignment3
+-- creates an assignment3 directory that will be used for all assignment
+related files
+
+$ wget ftp://
+ftp.gnu.org/gnu/coreutils/coreutils-7.6.tar.gz
+$ mkdir ~/
+wget ftp://ftp.gnu.org/gnu/coreutils/coreutils-7.6.tar.gz" and unzipped
+the tar file with "tar -xzvf coreutils-7.6.tar.gz". Meanwhile, I created
+a directory named coreutilsinstall in the home directory
+("mkdir ~/coreutilsInstall"), where the new coreutils 7.6 will be installed.
+Going back to the coreutils-7.6 directory, I ran the configure script
+with an option to install coreutils at ~/coreutilsInstall: "./configure
+--prefix="/u/eng/class/classkud/coreutilsInstall"" (the prefix flag
+requires an absolute path, can use the pwd command to figure out
+the absolute path of the current directory). After ./configure
+created the Makefile, I ran 'make; make install' to install the
+package. In ~/coreutilsInstall, we now can see three directories
+created, namely "bin", "lib" and "share". The buggy executable
+is contained in bin. While in ~/coreutilsInstall/bin, we can run:
+
+$ ./ls -l /bin/bash
+-rwxr-xr-x 1 root root 942200 2017-02-15 04:37 /bin/bash
+
+$ ls -l /bin/bash
+-rwxr-xr-x 1 root root 942200 Feb 15  2017 /bin/bash
+
+As we expect, with the current locale set to 'en_US.UTF-8'
+for all settings, we get the buggy YYYY-MM-DD format instead
+of the Unix traditional format.
+

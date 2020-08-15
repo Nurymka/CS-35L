@@ -1,0 +1,73 @@
+1)
+$ man -k <string>
+The command above will find matches of <string> in descriptions of each command's man page available and print them.
+
+$ man -K <string>
+The command above will find matches of <string> in the whole man page of each command and print the path to each matched file.
+
+To find the commands, I ran "man man", went down a page, and found -k -K options. To find what -k does, I looked up "man apropos".
+
+2)
+cp: /bin/cp
+wc: /usr/bin/wc
+
+To find both, I used "whereis <cmd>".
+
+3)
+$ w - shows who's currently logged in and the overall summary of current activity in the system
+$ [ - synonym for test builtin, a utility for conditional evaluation
+$ : - exit with zero code, a noop.
+$ . <filename> - reads and executes commands from <filename>
+$ % - same as fg [job_spec], resumes a background/stopped job
+
+I used "man whereis" to figure out where "whereis" finds its commands. The command "sysctl user.cs_path" returned "/usr/bin:/bin:/usr/sbin:/sbin". I used "find /usr/bin /bin /usr/sbin /sbin -name ?" which returned the paths for 'w' and '['.
+
+:, ., % are builtins which have no man pages, but I found out about their existence through "help '?'".
+
+4) Probably due to Mac OS, /usr/bin/emacs is a hard link for some reason. The command "readlink /usr/bin/emacs" returns an empty string, while "ls -l /usr/bin" only returns "-r-xr-xr-x   1 root   wheel   141M Jul 14 21:27 emacs*". If it was a symlink, the output of readlink would be the path to the file it points to.
+
+5) "o-x", where "o" are users who are not the the owner of the file or members of the group will not be able to ("-") execute ("x") the specified file. "g+s", where "g" are members of the current group will be able to ("+") run executables as if it was the group that owns the file ("s").
+
+Got the info above from our TA's presentations and "man chmod".
+
+6) "find <directory> -newermt '3 weeks ago'", where 'm' specifies the modification time and 't' specifies that the next parameter will be a time string.
+
+Discovered the info above from "man find".
+
+7) "find / -newermt '3 weeks ago' -type d"
+
+8) "find /usr/bin -type l | wc -l" returns 102 lines, so there are 102 symbolic lines. To find the same directory as find, I used "whereis /usr/bin". The symbolic links are found with the "-type l" option. "wc -l" is a command for the word count, with the option of only showing the number of lines.
+
+From the discussion, we know that | sends the stdout from find as stdin to wc and the -l option specifies the line count in wc.
+
+9) Assuming that "oldest" file means the oldest modified file, we can use "ls -lt | grep ^-" after we "cd /usr/lib". 'ls' shows the contents of the current directory; '-l' lists the contents in long format; '-t' sorts them by the last modified date. '|' sends the output of ls to the stdin of 'grep', which is used to filter the regular files. In the long format, the very first character in the string specifies the type file, '-' being a regular file. The regex '^-' specifies the beginning of a string starting with a '-' character.
+
+The very first line specifies the file 'ibgcc_s.10.5.dylib', where the last modification date is specified as Jul 30 2016.
+
+10) In "man locale" page, we can find the ENVIRONMENT section where we see LC_ALL, LC_COLLATE, LC_CTYPE and etc. They all are environment variables that can be set to override the current locale settings, so the 'locale' command gets its data from environment variables.
+
+11) sort-columns, sort-fields, sort-lines, sort-numeric-fields, sort-pages, sort-paragraphs, sort-regexp-fields, Buffer-menu-sort, tabulated-list-col-sort, tabulated-list-sort.
+
+By using the Emacs tutorial (C-h t), I found out the eXtend command (M-x), which allows to run emacs commands with their full names. It turned out that it features the autocomplete function, which I used to find commands matching "-sort", "sort-", "-sort-".
+
+I later found out the command "command-apropos" which is bound to 'C-h a', which prompts for a keyword and lists all the commands with that keyboard. The sort commands I found above turned out to be the same ones.
+
+12) By using "C-h k", which describes the command bound to the keystrokes you type, I found the description for each command:
+C-M-a (beginning-of-defun): Move backward to the beginning of a defun. 
+C-M-b (backward-sexp): Move backward across one across one balanced expression (sexp).
+C-M-c (exit-recursive-exit): Exit from the innermost recursive edit or minibuffer.
+C-M-d (down-list): Move forward down one level of parentheses.
+C-M-e (end-of-defun): Move forward to next end of defun.
+C-M-f (forward-sexp): Move forward across one balanced expression (sexp).
+C-M-g (keyboard-quit): Signal a 'quit' condition.
+C-M-h (mark-defun): Put mark at end of this defun, point at beginning.
+
+13) Same as C-M-g, it triggers the keyboard-quit command which can be used to quit any prompts Emacs brings up, use cases include quitting from M-x, cancelling out started keystroke combinations, and etc. Basically, it stops what Emacs is trying to do at the moment.
+
+To find its function, I used "C-h k" as well.
+
+14) yank pastes the text that is currently in the kill ring. Killing the text is slightly different from deleting it, as killing (commands that generally start with kill-*, the most common being M-w) saves the text to the kill ring and can be yanked later.
+
+Found out about the function from the discussions and "C-h a yank".
+
+15) The only difference I noticed  was the way "ls -l" specifies the in a shortened format like 3.3K, while emacs would format the size as 3300. Also, I see the current and parent directory in dired, but not in "ls -l".

@@ -1,0 +1,32 @@
+1) In case when all the traffic in intercepted, the network should still be secure. First of all,
+as everything encrypted with the public key of one end can only be decrypted with the private key
+on the other. Any traffic intercepted will be unreadable by the attackers. Even though the public
+key is available to everyone, the private key isn't ever sent through the network.
+
+In case keystrokes can be logged too, we are still safe, because the attacker can only get ahold of
+the passphrase. The passphrase is a symmetric key that is used to decrypt the private key itself.
+Since the private key is not sent through the network or typed in by the user, the attacker can't
+authenticate as the user. In case the client configured ssh-agent, the passphrase wouldn't be asked
+for, so the attacker can't even know the passphrase.
+Still, the keystrokes can help derive the session key, since the command key inputs are encrypted
+with the session key and sent to the host. In theory, because the attacker has both the original
+input and the encrypted input, with enough time and looking into a sufficient number of values, the
+session key can be dervied.
+
+In case the attacker has a physical access to the USB, the attacker can access ~/.ssh/id_rsa, that
+contains the public key. The catch is that it's encrypted itself by the passphrase, which is not
+stored anywhere. Having a encrypted private key is useless, although the attacker can possibly
+figure out what the passphrase is, which is a much easier task than computing the private key from
+the public key. We should still be safe.
+
+The problem arises only when the attacker has access to both the private key and the passphrase, as
+it now can decrypt any data sent by the host and make it believe that the public-private key pair
+used for authentication actually belongs to the attacker.
+
+2) The problem with digital signatures is the fact that it only makes sure that the data signed
+hasn't been tampered with. It signifies that the data that was signed by a public-private key pair
+is still the same data. The public key is not bound to a particular identity, that's why
+certificate authorities are used. Those are trusted third-parties who are trusted by both ends.
+They assign real names (and other additional identity info) to the public keys. That way we know
+that if the tarball was signed by Bob, and the signature validation with Bob's public key is
+successful, that the tarball was actually made by him.

@@ -1,0 +1,20 @@
+#!/bin/bash
+
+FILE1="miseng"
+FILE2="mishaw"
+
+declare -a OPTIONS=('' '-1' '-2' '-3' '-12' '-23' '-13' '-123')
+
+for OPTION in "${OPTIONS[@]}"
+do
+  PYDIFFS=`./comm.py ${OPTION} ${FILE1} ${FILE2}`
+  COMMDIFFS=`comm ${OPTION} ${FILE1} ${FILE2}`
+  if [ "$PYDIFFS" != "$COMMDIFFS" ]
+  then
+    echo "./comm.py and comm produce different outputs for ${OPTION}:"
+    echo "`diff <(echo "$COMMDIFFS") <(echo "$PYDIFFS")`"
+    exit 1
+  fi
+done
+
+exit 0

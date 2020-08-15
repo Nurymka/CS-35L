@@ -1,0 +1,53 @@
+Q1) Note that 'case_long_iso_time_style' is a label only used
+by the buggy version ls.c, where we the line
+"goto case_long_iso_time_style;" used to exist. Since Brady
+removed it, the label is of no use anymore and the compiler
+will ignore it completely. Therefore, leaving it in the file
+wouldn't affect the program execution at all.
+
+Q2) Looking up the manual on dcgettext (man dcgettext),
+we can look at the return values section and understand
+that in case the function cannot find a translation
+for the current locale, its value will fall back to
+long_time_format[i]. By playing around with different
+values of LC_ALL, including 'ja_JP.UTF-8' and
+random values like 'aaaa', I found out that
+'./ls -l' will fallback to English formatted dates
+in case of 'aaaa'. In case we have untranslated
+locales, we are assuming that the end user knows
+how to read the English formatted date.
+
+Q3) Running randline.py on /dev/null prints the following output:
+
+Traceback (most recent call last):
+  File "./randline.py", line 70, in <module>
+    main()
+  File "./randline.py", line 64, in main
+    sys.stdout.write(generator.chooseline())
+  File "./randline.py", line 34, in chooseline
+    return random.choice(self.lines)
+  File "/usr/lib64/python2.6/random.py", line 261, in choice
+    return seq[int(self.random() * len(seq))]  # raises IndexError if seq is empty
+IndexError: list index out of range
+
+From the call trace, we see that when the script tries to write
+to stdout, it calls the function generator.chooseline(). In that function,
+generator.lines is assigned an empty set, because f.readlines() gets to
+EOF immediately. In random.py, IndexError exception is raised as a member
+from an empty sequence is accessed.
+
+Q4) If we run randline.py on python3, we get the following output:
+
+File "./randline.py", line 65
+    except IOError as (errno, strerror):
+                      ^
+SyntaxError: invalid syntax
+
+From PEP 3110 (https://www.python.org/dev/peps/pep-3110/#rationale),
+we can find that the syntax "except os.error, (errno, errstr):"
+is deprecated to simplify the exception classes. We can't treat
+exceptions as tuples anymore, therefore the correct way would be:
+
+except IOError as err:
+       errno, strerror = err.args
+       ...

@@ -1,0 +1,17 @@
+--- /dev/null   2017-10-03 16:44:08.780148869 -0700
++++ ChangeLog   2017-10-29 15:27:58.170510000 -0700
+@@ -0,0 +1,4 @@
++2017-10-29  Nurym Kudaibergen  <classkud@lnxsrv04.seas.ucla.edu>
++
++       * lib/timespec.h: Fix timespec_cmp for cases when the difference between two timestamps exceeds the size of a signed 32-bit integer.
++
+--- lib/timespec.h	2017-10-29 14:20:24.130707000 -0700
++++ lib/timespec.h~	2017-10-29 13:17:48.912971000 -0700
+@@ -45,7 +45,7 @@
+ static inline int
+ timespec_cmp (struct timespec a, struct timespec b)
+ {
+-  int diff = a.tv_sec - b.tv_sec;
++  int diff = (a.tv_sec < b.tv_sec) ? -1 : (a.tv_sec > b.tv_sec);
+   return diff ? diff : a.tv_nsec - b.tv_nsec;
+ }

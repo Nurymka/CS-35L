@@ -1,0 +1,9 @@
+#!/bin/sh
+
+sed -nE 's/<td>(.+)<\/td>/\1/p' | \
+sed -n '0~2p' | tr "A-Z\`" "a-z\'" | \
+sed -E "s/^[[:space:]]*//; s/[[:space:]]*$//p" | \
+sed -E "s/<\/?u>//g" | \
+sed -E "s/\,? /\n/g" | \
+grep -E "^[pk'mnwlhaeiou]+$" | \
+sort -u

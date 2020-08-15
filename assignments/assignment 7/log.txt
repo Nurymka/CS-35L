@@ -1,0 +1,126 @@
+Lab Partner: Michelle Vo
+
+*** Configuring BeagleBone
+
+Before we are able to run processes on our partner's host, we need to configure the
+BeagleBone following the steps provided by our TA:
+1) Connect the BeagleBone to the computer via USB.
+2) Find BEAGLEBONE as an external device and open START.htm at
+the root of BEAGLEBONE.
+3) Follow the instructions on the page and install both Network and
+Serial drivers (for Mac OS). After the installation, "Step 1"
+and "Step 2" have to be highlighted green.
+
+Note: Mac OS Sierra (10.12.6) has a compatibility problem,
+so I had to follow the instructions in the third comment
+https://disqus.com/home/discussion/joshuawisecom/horndis_usb_tethering_driver_for_mac_os_x/
+
+4) We want to connect our BeagleBone to a Wi-Fi access point:
+$ sudo connmanctl
+-- we start a network management utility
+connmanctl> enable wifi
+connmanctl> scan wifi
+connmanctl> services
+-- prints out all the available access points
+connmanctl> agent on
+connmanctl> connect xxx
+-- xxx the descriptor of the access point (long string next to the SSID of the access point)
+If the access point is password protected, we would be prompted to enter the password.
+
+After the connection we can run 'services' again, and see that the access point
+we connected to has a "*AO" label before the name, where 'O' means we're online.
+connmanctl> quit
+
+5) We want to update apt-get's database and install some packages:
+$ sudo apt-get update
+$ sudo apt-get install xauth
+-- X11 forwarding support
+$ apt-get install firefox-esr-l10n-en-gb
+-- firefox
+
+*** Lab Environment
+
+Before we do anything with OpenSSH, we make sure that we have
+packages 'openssh-server' and 'openssh-client' installed:
+$ dpkg --get-selections | grep openssh
+which gave me the following output:
+openssh-client					install
+openssh-server					install
+openssh-sftp-server				install
+
+*** Configuring the server
+
+First, we generate the public and private keys that we're
+gonna use:
+$ ssh-keygen
+The command should prompt for the location to save the keys
+and we press 'Enter' to save them at the default location
+(~/.ssh/). And we would also be prompted for the passphrase.
+
+Now, we create a user that the partner is going to login as.
+$ sudo useradd -d /home/beagleuser -m beagleuser
+The -d option specifies the home directory of the user
+and -m option specifies the username.
+
+We also need to create the .ssh directory for the new user
+(that is where its recognized public keys are going to be stored):
+$ cd /home/beagleuser
+$ sudo mkdir .ssh
+$ sudo chown -R beagleuser .ssh
+-- change the owner of the .ssh directory to beagleuser
+$ sudo chmod 700 .ssh
+-- give the access rights of .ssh solely to the owner (beagleuser)
+
+*** Configuring the client
+
+As the client, we also need a pair of public and private keys
+that we're going to use:
+$ ssh-keygen
+
+We need to figure out the IP address of the server that we're
+going to connect to. So on our partner's BeagleBone, we run:
+$ ifconfig
+Make sure that both BeagleBones are connected to the same
+access point. On 'wlan0', we have a field called 'inet addr',
+which is going to be the local IP address that we're going
+to connect to. (In my case, partner's IP was 192.168.0.26)
+
+We need to copy our public key over to /home/beagleuser/.ssh/authorized_keys
+on the server:
+$ ssh-copy-id -i beagleuser@192.168.0.26
+It'll prompt for the passphrase of the private key and the password
+for the user twice. If ran successfully, we need to see the output
+with 'Number of key(s) added: 1'.
+
+To get rid of password authentication, we now add the generated
+private key to the ssh-agent by running:
+$ ssh-add
+
+Note: If the authentication agent is not available,
+we need to start one by running '$ ssh-agent /bin/bash'.
+Note: For some reason, an empty passphrase used when
+generating keys would create issues with ssh-add,
+that's why I made sure I used a passphrase when
+I generated keys.
+
+By default, sshing leads us to running /bin/sh,
+but that can be changed by running the following on the server:
+$ chsh -s /bin/bash beagleuser
+
+Now, we can actually ssh into our partner's BeagleBone
+using its IP address and the created username:
+$ ssh -Y beagleuser@192.168.0.26
+We shouldn't be prompted for a password, nor a passphrase.
+
+We should be able to run GUI applications on the host,
+and display them on our computer:
+$ firefox
+
+Note: I made sure that I had forwarding when I sshed
+into my own BeagleBone locally, and to my partner's
+BeagleBone over the network. But I kept getting either
+'Error: GDK_BACKEND does not match available displays'
+or 'ssh: connect to host 192.168.0.26 port 22: No route to host'.
+That's why I decided to create a file on the host
+with some sample text remotely, and made my partner check that
+the file is actually there.

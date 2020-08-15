@@ -1,0 +1,146 @@
+1/2) To implement tr2b/tr2u, I went with this general sequence of steps:
+main(argc, argv) {
+    check that argc == 3
+    check that argv[1] (from) and agrv[2] (to) are not the same length
+    check that argv[1] (from) has no duplicates (wrote a little helper function)
+
+    char c;
+    while (getchar is not EOF):
+      int pos = get index of char c in string 'from';
+      if char c is in 'from':
+        putchar(to[pos])
+      else
+        putchar(c)
+}
+For tr2u, I replaced getchar/putchar with their analogous read/write system calls
+
+3) To compare the number of system calls made by tr2b and tr2u, I first downloaded
+a big file (norvig.com/big.txt) and saved it to the current directory:
+$ wget norvig.com/big.txt
+
+For copying files to the terminal:
+
+$ strace -c ./tr2b abcdefghi 123456789 < big.txt
+% time     seconds  usecs/call     calls    errors syscall
+------ ----------- ----------- --------- --------- ----------------
+ 98.96    0.011646           0    128534           write
+  1.04    0.000122           1       102           read
+  0.00    0.000000           0         2           open
+  0.00    0.000000           0         2           close
+  0.00    0.000000           0         4           fstat
+  0.00    0.000000           0        10           mmap
+  0.00    0.000000           0         3           mprotect
+  0.00    0.000000           0         1           munmap
+  0.00    0.000000           0         1           brk
+  0.00    0.000000           0         1         1 access
+  0.00    0.000000           0         1           execve
+  0.00    0.000000           0         1           arch_prctl
+------ ----------- ----------- --------- --------- ----------------
+100.00    0.011768                128662         1 total
+
+$ strace -c ./tr2u abcdefghi 123456789 < big.txt
+% time     seconds  usecs/call     calls    errors syscall
+------ ----------- ----------- --------- --------- ----------------
+ 55.01    0.575753           0   6488666           write
+ 44.99    0.470948           0   6488668           read
+  0.00    0.000000           0         2           open
+  0.00    0.000000           0         2           close
+  0.00    0.000000           0         2           fstat
+  0.00    0.000000           0         8           mmap
+  0.00    0.000000           0         3           mprotect
+  0.00    0.000000           0         1           munmap
+  0.00    0.000000           0         1           brk
+  0.00    0.000000           0         1         1 access
+  0.00    0.000000           0         1           execve
+  0.00    0.000000           0         1           arch_prctl
+------ ----------- ----------- --------- --------- ----------------
+100.00    1.046701              12977356         1 total
+
+For copying files to another file:
+$ strace -c ./tr2b abcdefghi 123456789 < big.txt > big_tr2b.txt
+------ ----------- ----------- --------- --------- ----------------
+100.00    0.000038           0       102           read
+  0.00    0.000000           0       100           write
+  0.00    0.000000           0         2           open
+  0.00    0.000000           0         2           close
+  0.00    0.000000           0         4           fstat
+  0.00    0.000000           0        10           mmap
+  0.00    0.000000           0         3           mprotect
+  0.00    0.000000           0         1           munmap
+  0.00    0.000000           0         1           brk
+  0.00    0.000000           0         1         1 access
+  0.00    0.000000           0         1           execve
+  0.00    0.000000           0         1           arch_prctl
+------ ----------- ----------- --------- --------- ----------------
+100.00    0.000038                   228         1 total
+
+$ strace -c ./tr2u abcdefghi 123456789 < big.txt > big_tr2u.txt
+% time     seconds  usecs/call     calls    errors syscall
+------ ----------- ----------- --------- --------- ----------------
+ 57.20    0.698218           0   6488666           write
+ 42.80    0.522414           0   6488668           read
+  0.00    0.000000           0         2           open
+  0.00    0.000000           0         2           close
+  0.00    0.000000           0         2           fstat
+  0.00    0.000000           0         8           mmap
+  0.00    0.000000           0         3           mprotect
+  0.00    0.000000           0         1           munmap
+  0.00    0.000000           0         1           brk
+  0.00    0.000000           0         1         1 access
+  0.00    0.000000           0         1           execve
+  0.00    0.000000           0         1           arch_prctl
+------ ----------- ----------- --------- --------- ----------------
+100.00    1.220632              12977356         1 total
+
+First, we see that for both cases ./tr2b performs a lot better in
+terms of system calls compared to ./tr2u. Obivously, putchar/getchar's
+internal usage of buffers significantly cuts the number of system calls.
+Another interesting thing to note is how ./tr2b performs for copying
+a file to another file and copying to the terminal. While ./tr2u
+stays the same in terms of syscalls, ./tr2b significantly
+improves when we're writing to a file.
+If to run strace without the -c option, we can actually see that
+the write() call is made for every line there is in big.txt. That
+behavior makes sense, because putchar needs to keep outputting to
+a terminal and does that one line at a time. In the case of
+copying to another file, that's where buffering really shines through
+and can use the whole buffer size (2^16 bytes) and write 2^16 bytes
+at a time.
+
+4) To compare execution time, I ran the 'time' command for both
+tr2b and tr2u:
+
+For copying file to a terminal:
+
+$ time ./tr2b abcdefghi 123456789 < big.txt
+
+real	0m1.276s
+user	0m0.746s
+sys	0m0.153s
+
+$ time ./tr2u abcdefghi 123456789 < big.txt
+
+real	0m8.705s
+user	0m0.706s
+sys	0m7.993s
+
+For copying from one file to another:
+
+$ time ./tr2b abcdefghi 123456789 < big.txt > time_tr2b.txt
+
+real	0m0.585s
+user	0m0.487s
+sys	0m0.008s
+
+$ time ./tr2u abcdefghi 123456789 < big.txt > time_tr2u.txt
+
+real	0m6.776s
+user	0m0.745s
+sys	0m5.944s
+
+Note how the amount of system calls we got from systrace
+reflects on the performance of each program. Copying to a terminal for tr2b
+is twice as slow as copying to a file (for reasons stated in task 3).
+Note that even though tr2u has the same amount of read/write syscalls
+for both cases, copying to a file is still a bit faster (presumably due
+to the screen updates done during the execution when writing to a terminal).

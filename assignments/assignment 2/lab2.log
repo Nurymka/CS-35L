@@ -1,0 +1,167 @@
+! Laboratory: Spell-checking Hawaiian
+
+*** Changing Locale
+
+To start off, I set the current locale to standard C
+with "export LC_ALL='C'", so locale outputs:
+
+...
+LC_CTYPE="C"
+LC_COLLATE="C"
+...
+
+The important thing here is that LC_COLLATE is "C", so the sorting of the
+/usr/share/dict/words file is done according to ASCII.
+
+*** File Setup
+
+I saved the contents of assign2.html with curl:
+
+$ curl -o assign2.html \
+  http://web.cs.ucla.edu/classes/fall17/cs35L/assign/assign2.html
+
+Then, I sorted the contents of /usr/share/dict/words and saved it as words:
+$ sort /usr/share/dict/words > words
+
+*** tr command differences
+
+$ tr -c 'A-Za-z' '[\n*]' < assign2.html > tr1
+takes the complement of set 'A-Za-z', so everything that is not a letter is
+replaced with a newline character.
+
+$ tr -cs 'A-Za-z' '[\n*]' < assign2.html > tr2
+the difference with the output above is also that every repetition of any
+character that is not in the set 'A-Za-z' is grouped and replaced with
+only one newline character.
+
+$ tr -cs 'A-Za-z' '[\n*]' < assign2.html  | sort > tr3
+in addition to the changes above, the new output also
+has each line sorted in ascending ASCII order
+
+$ tr -cs 'A-Za-z' '[\n*]' < assign2.html | sort -u > tr4
+the sorted output has also removed any duplicate lines
+(-u option)
+
+$ tr -cs 'A-Za-z' '[\n*]' < assign2.html | sort -u | comm - words > tr5
+the output is the comparison of the sorted file 'tr4' and sorted
+file 'words', where the first column (no tabs) are the lines unique
+to 'tr4', second column (one tab) are the lines unique to 'words',
+and the third column (two tabs) are the lines common to both files.
+
+$ tr -cs 'A-Za-z' '[\n*]' < assign2.html | sort -u | comm -23 - words > tr6
+the columns 2 and 3 in comm are emitted, so the output contains
+only the lines unique to file1 (in this case 'tr4').
+
+*** Implementing a Hawaiian spellchecker
+
+I got a copy of hawaiian words from the provided webpage with wget:
+$ wget http://mauimapp.com/moolelo/hwnwdseng.htm
+The html file is saved as ./hwnwdseng.htm
+
+After that, I created a new file buildwords and start the first line with
+'#!/bin/sh' to spawn a child shell. Each intermediate step will be a
+bash command one a single line which will pipe its stdout to the
+stdin of the next step.
+
+1) To scrape Hawaiian words in td tags, I initially thought of using a regex
+expression which would span across multiple lines and use a capture the
+Hawaiian word in a group: /<tr>\s+.+<\/td>\s+<td>(.+)<\/td>/g. The problem
+lies in the fact that grep/sed basically read one line at a time. I decided to
+go with a different approach, that includes extracting all td tags and deleting
+every odd line:
+
+sed -nE 's/<td>(.+)<\/td>/\1/p' | \
+
+The sed command captures the insides of the contents
+of each non-empty <td> tag and prints out the captured group.
+Deconstructing the command, we have:
+<td>(.+)<\/td> -- captures any characters inside <td></td>
+\1 -- get the match in the captured group
+p -- print lines to stdout
+
+2) To only retrieve the hawaiian words, I filtered out every even line with sed:
+
+sed -n '0~2p' | \
+
+The command starts out on line 0 and prints out every second line after it.
+
+3) To convert all uppercase letters to lowercase and grave accents
+to apostrophes, I used tr:
+
+tr "A-Z\`" "a-z\'" | \
+
+4) To clean up the lines, I decided to trim the leading and trailing
+whitespaces with sed:
+
+sed -E "s/^[[:space:]]*//; s/[[:space:]]*$//p" | \
+
+The first s command matches all the leading (^) characters in the [[:space:]]
+set and removes them, the second s command matches all the trailing ($)
+characters in the [[:space:]] set and removes them.
+
+5) To remove all the <u> tags and keep its contents, I used sed:
+
+sed -E "s/<\/?u>//g" | \
+
+-E option enables EGE, with which less characters are supposed to be escaped.
+<\/?u> -- matches either <u> or </u>.
+// -- means that the replacement string is empty.
+g -- the global flag makes sure that multiple matches in the line are caught.
+
+6) We are treating each word delimited by commas or spaces as separate words:
+
+sed -E "s/\,? /\n/g" | \
+
+The /\,? / regex optionally matches commas and a space, substituting them
+into a newline character \n.
+
+7) To filter out only Hawaiian words, I used grep to match words that
+only contain characters in the set [pk' mnwlhaeiou] and only printed those out.
+
+grep -E "^[pk'mnwlhaeiou]+$" | \
+
+8) To remove duplicates and sort them, I used the sort command:
+
+sort -u
+
+Note: To easily go between intermediate steps, I would save the output
+of each command to a new file to work with it later.
+
+*** The buildwords script
+
+Combining all the commands together, we get the script below:
+
+#!/bin/sh
+sed -nE 's/<td>(.+)<\/td>/\1/p' | \
+sed -n '0~2p' | tr "A-Z\`" "a-z\'" | \
+sed -E "s/^[[:space:]]*//; s/[[:space:]]*$//p" | \
+sed -E "s/<\/?u>//g" | \
+sed -E "s/\,? /\n/g" | \
+grep -E "^[pk'mnwlhaeiou]+$" | \
+sort -u
+
+*** Running the spellchecker
+
+To spellcheck english, we can just use the provided command in the
+assignment:
+
+tr -cs 'A-Za-z' '[\n*]' | sort -u | comm -23 - words | wc -l
+
+But with "wc -l" at the end to count the outputted number of lines.
+There are 81 english misspelled words (actually 80, one line is empty),
+
+Analogously, to spellcheck hawaiian, we run the same commands
+but with hwords
+
+tr -cs 'A-Za-z' '[\n*]' | sort -u | comm -23 - hwords | wc -l
+
+There are 449 lines, so 449 misspelled hawaiian words (448 if
+we don't count the empty line).
+
+To figure out which words are "misspelled" as English/Hawaiian,
+I saved the output of each mispelled word to ./miseng and ./mishaw
+respectively. Then, I ran "comm -23 miseng mishaw" to output
+words that are mispelled as English, which are "halau", "lau" and "wiki".
+Running "comm -13 miseng mishaw" outputs 371 words, which
+include "work", "rather", "occurrence" and etc.
+Those 371 words are 'misspelled' Hawaiian words.
